@@ -10,7 +10,8 @@ const manifest = {
   description: "Proyecto de adaptación de complementos de Kino",
   resources: ["catalog", "meta", "stream"],
   types: ["movie", "series"],
-  idPrefixes: ["tt"]
+  idPrefixes: ["tt"],
+  catalogs: []
 };
 
 const builder = new addonBuilder(manifest);
