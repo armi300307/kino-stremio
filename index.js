@@ -8,9 +8,9 @@ const CATALOG_ID = "archive_public_domain_films";
 
 const manifest = {
   id: "com.armi.kino-stremio",
-  version: "1.1.0",
+  version: "1.2.0",
   name: "Kino para Stremio - Cine clasico",
-  description: "Catalogo de prueba de peliculas clasicas de Internet Archive.",
+  description: "Catalogo de peliculas clasicas de Internet Archive.",
   resources: ["catalog", "meta", "stream"],
   types: ["movie"],
   idPrefixes: ["ia:"],
@@ -27,7 +27,9 @@ const manifest = {
 const builder = new addonBuilder(manifest);
 
 function cleanText(value) {
-  return String(Array.isArray(value) ? value[0] ?? "" : value ?? "")
+  return String(
+    Array.isArray(value) ? value[0] ?? "" : value ?? ""
+  )
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
@@ -45,7 +47,8 @@ function toMeta(doc) {
     type: "movie",
     name: cleanText(doc.title) || id,
     poster: `${ARCHIVE}/services/img/${encodeURIComponent(id)}`,
-    description: cleanText(doc.description).slice(0, 700) ||
+    description:
+      cleanText(doc.description).slice(0, 700) ||
       "Pelicula clasica de Internet Archive.",
     releaseInfo: cleanText(doc.year) || undefined
   };
@@ -54,12 +57,18 @@ function toMeta(doc) {
 async function searchArchive(search = "", rows = 30) {
   const params = new URLSearchParams();
 
-  params.set(
-    "q",
-    `collection:(feature_films) AND mediatype:(movies)${
-      search ? ` AND title:(${search})` : ""
-    }`
-  );
+  let query = "collection:(feature_films) AND mediatype:(movies)";
+
+  if (search) {
+    const safeSearch = search.replace(/[+\-!(){}[\]^"~*?:\\/]/g, " ");
+    const terms = safeSearch.trim().split(/\s+/).filter(Boolean);
+
+    if (terms.length) {
+      query += ` AND title:(${terms.join(" AND ")})`;
+    }
+  }
+
+  params.set("q", query);
 
   for (const field of [
     "identifier",
@@ -167,36 +176,54 @@ builder.defineStreamHandler(async args => {
     const files = Array.isArray(data?.files) ? data.files : [];
 
     const playable = files
-      .filter(file =>
-        /\.(mp4|m4v|webm)$/i.test(file.name || "") &&
-        Number(file.size || 0) > 0
-      )
+      .filter(file => {
+        const name = String(file.name || "");
+        const format = String(file.format || "").toLowerCase();
+
+        const videoExtension =
+          /\.(mp4|m4v|webm|mkv|ogv)$/i.test(name);
+
+        const videoFormat =
+          format.includes("mpeg4") ||
+          format.includes("h.264") ||
+          format.includes("h264") ||
+          format.includes("webm") ||
+          format.includes("matroska") ||
+          format.includes("ogg video");
+
+        return (
+          Number(file.size || 0) > 0 &&
+          (videoExtension || videoFormat) &&
+          !name.includes("/")
+        );
+      })
       .sort((a, b) => {
-        const rank = file =>
-          /\.mp4$/i.test(file.name) ? 0 :
-          /\.m4v$/i.test(file.name) ? 1 : 2;
+        const rank = file => {
+          const name = String(file.name || "").toLowerCase();
+
+          if (/\.mp4$/i.test(name)) return 0;
+          if (/\.m4v$/i.test(name)) return 1;
+          if (/\.webm$/i.test(name)) return 2;
+          return 3;
+        };
 
         return rank(a) - rank(b) ||
           Number(b.size || 0) - Number(a.size || 0);
       });
 
-    const file = playable[0];
+    const streams = playable.slice(0, 5).map(file => {
+      const encodedFile = String(file.name)
+        .split("/")
+        .map(encodeURIComponent)
+        .join("/");
 
-    if (!file) return { streams: [] };
+      return {
+        title: `Internet Archive - ${file.name}`,
+        url: `${ARCHIVE}/download/${encodeURIComponent(identifier)}/${encodedFile}`
+      };
+    });
 
-    const encodedFile = file.name
-      .split("/")
-      .map(encodeURIComponent)
-      .join("/");
-
-    return {
-      streams: [
-        {
-          title: `Internet Archive - ${file.format || "Video"}`,
-          url: `${ARCHIVE}/download/${encodeURIComponent(identifier)}/${encodedFile}`
-        }
-      ]
-    };
+    return { streams };
   } catch (error) {
     console.error("Error buscando video:", error.message);
     return { streams: [] };
