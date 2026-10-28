@@ -1,5 +1,7 @@
 
-import { addonBuilder, serveHTTP } from "stremio-addon-sdk";
+import pkg from "stremio-addon-sdk";
+
+const { addonBuilder, serveHTTP } = pkg;
 
 const manifest = {
   id: "com.armi.kino-stremio",
@@ -25,4 +27,6 @@ builder.defineStreamHandler(async () => ({
   streams: []
 }));
 
-serveHTTP(builder.getInterface(), { port: process.env.PORT || 7000 });
+serveHTTP(builder.getInterface(), {
+  port: process.env.PORT || 7000
+});
