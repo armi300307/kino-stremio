@@ -1,0 +1,13 @@
+
+{
+  "name": "kino-stremio",
+  "version": "1.0.0",
+  "description": "Proyecto para adaptar complementos de Kino a Stremio",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "stremio-addon-sdk": "^1.6.10"
+  }
+}
